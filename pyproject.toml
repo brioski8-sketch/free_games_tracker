@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+markers = [
+    "network: tests that hit live APIs (skipped via -m 'not network')",
+]
+addopts = "-m 'not network'"
+testpaths = ["tests"]

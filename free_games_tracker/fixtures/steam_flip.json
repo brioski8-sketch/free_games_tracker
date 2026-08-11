@@ -1,0 +1,22 @@
+[
+  {
+    "store": "steam", "appid": 203770, "title": "Crusader Kings II",
+    "offer_type": "game", "current_price": 0, "current_currency": "USD",
+    "original_price": 39.99, "original_price_currency": "USD", "is_free_now": true,
+    "end_date": null, "promotion_window": "permanent", "is_permanent": true,
+    "store_url": "https://store.steampowered.com/app/203770",
+    "offer_url": "https://store.steampowered.com/app/203770",
+    "source_feed": "steam_appdetails_flip", "detected_at": "2026-08-06T15:00:00Z",
+    "confidence": "high", "keep_action": true
+  },
+  {
+    "store": "steam", "appid": 431960, "title": "GRIT",
+    "offer_type": "game", "current_price": 0, "current_currency": "USD",
+    "original_price": 19.99, "original_price_currency": "USD", "is_free_now": true,
+    "end_date": null, "promotion_window": "permanent", "is_permanent": true,
+    "store_url": "https://store.steampowered.com/app/431960",
+    "offer_url": "https://store.steampowered.com/app/431960",
+    "source_feed": "steam_appdetails_flip", "detected_at": "2026-08-06T15:00:00Z",
+    "confidence": "high", "keep_action": true
+  }
+]

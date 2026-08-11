@@ -1,0 +1,53 @@
+{
+  "kind": "Listing",
+  "detected_at": "2026-08-06T15:00:00Z",
+  "data": {
+    "after": null,
+    "dist": 3,
+    "children": [
+      {
+        "kind": "t3",
+        "data": {
+          "id": "ab12",
+          "title": "Moonlighter is FREE on Steam (limited time)",
+          "selftext": "Originally priced at $24.99, Moonlighter is now free to keep on Steam until the giveaway window closes. Add it to your library.",
+          "permalink": "/r/FreeGameFindings/comments/ab12/moonlighter_is_free_on_steam_limited_time/",
+          "link_flair_text": "Steam",
+          "preview": {
+            "images": [
+              {"source": {"url": "https://preview.redd.it/moonlighter.jpg"}}
+            ]
+          }
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "cd34",
+          "title": "Boreal Blade free to claim on GOG",
+          "selftext": "GOG giveaway - grab it while the offer lasts. Usually paid, now available to claim for free.",
+          "permalink": "/r/FreeGameFindings/comments/cd34/boreal_blade_free_to_claim_on_gog/",
+          "link_flair_text": "GOG",
+          "preview": {
+            "images": [
+              {"source": {"url": "https://preview.redd.it/boreal.jpg"}}
+            ]
+          }
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "ef56",
+          "title": "[F2P to paid] Battlerite is no longer free-to-play",
+          "selftext": "Battlerite has switched from free-to-play to a paid base game. This is an inverse transition, not a giveaway.",
+          "permalink": "/r/FreeGameFindings/comments/ef56/f2p_to_paid_battlerite_no_longer_free_to_play/",
+          "link_flair_text": "F2P to Paid",
+          "preview": {
+            "images": []
+          }
+        }
+      }
+    ]
+  }
+}

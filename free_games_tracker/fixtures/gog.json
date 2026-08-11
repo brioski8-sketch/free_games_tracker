@@ -1,0 +1,11 @@
+[
+  {
+    "store": "gog", "product_id": 1443699418, "title": "Return to Castle Wolfenstein",
+    "offer_type": "GAME", "current_price": 0, "original_price": 4.99,
+    "original_price_currency": "USD", "end_date": null, "promotion_window": "unknown",
+    "is_permanent": false, "store_url": "https://www.gog.com/en/game/return_to_castle_wolfenstein",
+    "offer_url": "https://www.gog.com/en/game/return_to_castle_wolfenstein",
+    "source_feed": "gog_catalog_free", "detected_at": "2026-08-06T15:00:00Z",
+    "confidence": "medium", "keep_action": true
+  }
+]

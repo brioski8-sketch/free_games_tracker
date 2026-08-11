@@ -1,0 +1,30 @@
+# Secrets — never commit real credentials
+.env
+.env.*
+*.env
+!*.env.example
+
+# Runtime state + generated output (not source)
+state.db
+state.db-*
+reports/
+*.sqlite
+*.sqlite3
+
+# Python bytecode / caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtualenvs
+.venv/
+venv/
+env/
+virtualenv/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

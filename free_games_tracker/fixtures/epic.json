@@ -1,0 +1,52 @@
+[
+  {
+    "store": "epic", "title": "We Were Here Together", "offer_id": "wewere together",
+    "offer_type": "BASE_GAME", "current_price": 0, "original_price": 12.99,
+    "original_price_currency": "USD", "start_date": "2026-08-06T15:00:00.000Z",
+    "end_date": "2026-08-13T15:00:00.000Z", "promotion_window": "168h",
+    "store_url": "https://store.epicgames.com/en-US/we-were-here-together",
+    "offer_url": "https://store.epicgames.com/en-US/we-were-here-together",
+    "source_feed": "epic_freeGamesPromotions:current", "detected_at": "2026-08-06T15:00:00Z",
+    "confidence": "high", "keep_action": true
+  },
+  {
+    "store": "epic", "title": "Beacon Pines", "offer_id": "beacon-pines",
+    "offer_type": "BASE_GAME", "current_price": 0, "original_price": 19.99,
+    "original_price_currency": "USD", "start_date": "2026-08-06T15:00:00.000Z",
+    "end_date": "2026-08-13T15:00:00.000Z", "promotion_window": "168h",
+    "store_url": "https://store.epicgames.com/en-US/beacon-pines",
+    "offer_url": "https://store.epicgames.com/en-US/beacon-pines",
+    "source_feed": "epic_freeGamesPromotions:current", "detected_at": "2026-08-06T15:00:00Z",
+    "confidence": "high", "keep_action": true
+  },
+  {
+    "store": "epic", "title": "Caravan SandWitch", "offer_id": "caravan-sandwitch",
+    "offer_type": "BASE_GAME", "current_price": 24.99, "original_price": 22.99,
+    "original_price_currency": "USD", "start_date": "2026-08-13T15:00:00.000Z",
+    "end_date": "2026-08-20T15:00:00.000Z", "promotion_window": "168h",
+    "store_url": "https://store.epicgames.com/en-US/caravan-sandwitch",
+    "offer_url": "https://store.epicgames.com/en-US/caravan-sandwitch",
+    "source_feed": "epic_freeGamesPromotions:upcoming", "detected_at": "2026-08-06T15:00:00Z",
+    "confidence": "high", "keep_action": true
+  },
+  {
+    "store": "epic", "title": "Fortnite", "offer_id": "fortnite",
+    "offer_type": "BASE_GAME", "current_price": 0, "original_price": 0,
+    "original_price_currency": "USD", "start_date": "2017-01-01T00:00:00Z",
+    "end_date": null, "promotion_window": "permanent",
+    "store_url": "https://store.epicgames.com/en-US/fortnite",
+    "offer_url": "https://store.epicgames.com/en-US/fortnite",
+    "source_feed": "epic_freeGamesPromotions:current", "detected_at": "2026-08-06T15:00:00Z",
+    "confidence": "high", "keep_action": true
+  },
+  {
+    "store": "epic", "title": "Lost Explorers' Swords Pack", "offer_id": "lost-swords",
+    "offer_type": "ADD_ON", "current_price": 0, "original_price": 3.99,
+    "original_price_currency": "USD", "start_date": "2026-08-06T15:00:00.000Z",
+    "end_date": "2026-08-13T15:00:00.000Z", "promotion_window": "168h",
+    "store_url": "https://store.epicgames.com/en-US/lost-swords",
+    "offer_url": "https://store.epicgames.com/en-US/lost-swords",
+    "source_feed": "epic_freeGamesPromotions:current", "detected_at": "2026-08-06T15:00:00Z",
+    "confidence": "high", "keep_action": true
+  }
+]

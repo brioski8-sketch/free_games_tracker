@@ -1,0 +1,161 @@
+{
+  "brief": {
+    "title": "PC game storefronts that periodically let users permanently add normally-paid games for free",
+    "researcher": "Echo (researcher profile)",
+    "date": "2026-08-09",
+    "scope": "free-to-keep giveaways and paid-to-free conversions on PC storefronts. Excludes always-F2P games, demos, trials, playtests, DLC, and subscription-lending (unless noted)."
+  },
+  "summary": "Six source categories: Steam, Epic Games Store, GOG, Amazon Prime Gaming (now Amazon Luna), itch.io, and community aggregators. The most reliable machine-readable feed is Epic's public freeGamesPromotions API. No store's raw 'free' filter can distinguish a temporary free-to-keep giveaway from a permanently-F2P game or a demo; programmatic detection requires tracking price/is_free change over time, or consuming curated community feeds.",
+  "sources": [
+    {
+      "name": "Steam",
+      "store": "store.steampowered.com",
+      "event_types": [
+        "free-to-keep giveaways (publisher sets paid game to 100% off for a limited window; claim = keep forever)",
+        "permanent paid-to-free conversions (developer flips game to F2P)"
+      ],
+      "access_methods": [
+        {"name": "store search with price=0", "url": "https://store.steampowered.com/search/?price=0&os=win", "note": "Heavily polluted with F2P and demos (~2,656 results)"},
+        {"name": "appdetails API (no key)", "url": "https://store.steampowered.com/api/appdetails?appids=<appid>&cc=us&l=en", "note": "Returns data.is_free (bool) and data.price_overview (omitted when free). Verified live."},
+        {"name": "Steam News search", "url": "https://store.steampowered.com/news/search/?term=free+to+keep"},
+        {"name": "SteamDB upcoming/free", "url": "https://steamdb.info/upcoming/free/", "note": "Curated free-to-keep + free-weekend tracking with expiry. Some pages anti-bot/JS-rendered, need browser."},
+        {"name": "Steam 'Free To Keep' community group", "url": "https://steamcommunity.com/groups/freetokeep/announcements", "note": "Daily-updated announcements"}
+      ],
+      "signal_presented_as": "price = $0 / 'Free' with a limited-time offer note (giveaway); is_free=true with no price_overview (conversion or F2P)",
+      "update_cadence": "Irregular: publisher-driven giveaways (multiple/week at peak sales, sometimes zero); permanent conversions sporadic (a few/month)",
+      "free_detection_field": "appdetails: data.is_free + data.price_overview",
+      "detection_pitfall": "is_free=true is indistinguishable between native F2P (Apex Legends verified) and converted game (Crusader Kings II verified). Must track False->True flip over time or use a curated list."
+    },
+    {
+      "name": "Epic Games Store",
+      "store": "store.epicgames.com",
+      "event_types": [
+        "weekly free-to-keep giveaway (1-2 games every Thursday since Dec 2018)",
+        "annual Christmas 'Mystery Games' daily reveals",
+        "occasional mobile/Android extras"
+      ],
+      "access_methods": [
+        {"name": "official free games page", "url": "https://store.epicgames.com/en-US/free-games", "note": "Shows current + upcoming weeks; mixes giveaway with F2P and demo carousels on one DOM"},
+        {"name": "official public JSON API (no auth, verified live)", "url": "https://store-site-backend-static-ipv4.ak.epicgames.com/freeGamesPromotions?locale=en-US&country=US&allowCountries=US", "note": "data.Catalog.searchStore.elements[] with promotions.promotionalOffers/upcomingPromotionalOffers (startDate,endDate,discountSetting.discountPercentage=0). Cleanest programmatic feed."},
+        {"name": "unofficial community mirrors", "url": "https://github.com/woicip/epic-free-games"}
+      ],
+      "signal_presented_as": "'Free Giveaway' header + struck original price; price=0 with a promotional offer block",
+      "update_cadence": "Weekly, deterministic: Thursday ~15:00 UTC, expires following Thursday; upcoming week usually pre-revealed",
+      "free_detection_field": "freeGamesPromotions JSON: promotionalOffers blocks with discountPercentage=0 on offerType=BASE_GAME",
+      "detection_pitfall": "F2P titles (Fortnite, Apex, etc.) have no promotionalOffers block; demos/trials/playtests share the page and must be excluded by offerType + title tokens."
+    },
+    {
+      "name": "GOG",
+      "store": "gog.com",
+      "event_types": [
+        "permanent 'always free' collection (never paid; ~12,545 DRM-free titles)",
+        "limited 48-hour giveaways during major sales/campaigns (e.g., Freedom to Buy Aug 2025 gave 13 titles; Nexus: The Jupiter Incident Jul 2026)"
+      ],
+      "access_methods": [
+        {"name": "catalog API (public, verified live)", "url": "https://catalog.gog.com/v1/catalog?limit=5&price=free", "note": "Returns permanently-free bucket (200 pages/10,000 shown); does NOT expose time-limited giveaways"},
+        {"name": "free collection page", "url": "https://www.gog.com/en/partner/free_games", "note": "JS-rendered with client-side templating; use browser or catalog API"},
+        {"name": "gg.deals free GOG tracking", "url": "https://gg.deals/news/free-gog-games/"}
+      ],
+      "signal_presented_as": "price = 0 in catalog API (permanent bucket); giveaways announced via news/banners",
+      "update_cadence": "Permanent bucket stable; giveaways sporadic (a few per major sale, 48h windows)",
+      "free_detection_field": "catalog price=free (but mostly permanently-free, so giveaway events need gg.deals/r-gog)",
+      "detection_pitfall": "The free bucket is dominated by always-free titles; time-limited giveaways are not cleanly exposed in the catalog API."
+    },
+    {
+      "name": "Amazon Prime Gaming / Amazon Luna",
+      "store": "luna.amazon.com (rebranded from gaming.amazon.com, Aug 2026)",
+      "event_types": [
+        "~12 free PC games/month for active Prime subscribers, released in weekly batches",
+        "claims are codes/rewards that expire (end of month); redeemed games kept forever",
+        "also in-game bundles/loot and Luna cloud-streaming titles"
+      ],
+      "access_methods": [
+        {"name": "claims home", "url": "https://luna.amazon.com/claims/home", "note": "Auth required; needs active Prime subscription"},
+        {"name": "legacy (redirects)", "url": "https://gaming.amazon.com"},
+        {"name": "unofficial JSON (unreliable)", "url": "https://gamesdb.prime.amazon.com/util/getGames", "note": "Unofficial, may break; not recommended"}
+      ],
+      "signal_presented_as": "'Claim' reward card on the claims page; code with expiry",
+      "update_cadence": "Monthly, batched weekly; poll weekly",
+      "free_detection_field": "auth-gated; no stable public JSON feed",
+      "detection_pitfall": "Requires active paid subscription + credentials for headless access; no clean public API."
+    },
+    {
+      "name": "itch.io",
+      "store": "itch.io",
+      "event_types": [
+        "creator-initiated 100%-off sales making a normally-paid game temporarily free",
+        "creators may also run permanent 100% offers or long-duration sales",
+        "no centralized weekly giveaway program"
+      ],
+      "access_methods": [
+        {"name": "on sale page", "url": "https://itch.io/games/on-sale"},
+        {"name": "sales hub", "url": "https://itch.io/sales"},
+        {"name": "creator sales docs", "url": "https://itch.io/docs/creators/sales", "note": "'You can set the rate to 100% if you want your content to be temporarily free.'"}
+      ],
+      "signal_presented_as": "price = 0 / 'Free' via a 100% sale",
+      "update_cadence": "Continuous / unpredictable",
+      "free_detection_field": "price=0 on on-sale listing",
+      "detection_pitfall": "No reliable machine-visible flag distinguishing always-free/PWYW from 'was paid and now temporarily free'; needs polling + price history."
+    },
+    {
+      "name": "Community Aggregators (recommended machine-readable layer)",
+      "store": "multi-store",
+      "event_types": [
+        "curated free-to-keep giveaways across all stores with expiry metadata"
+      ],
+      "access_methods": [
+        {"name": "r/FreeGameFindings", "url": "https://www.reddit.com/r/FreeGameFindings/", "note": "~430k members; flairs include 'previously given', 'f2p to paid', 'tasks'; accessible via .json or official API"},
+        {"name": "gg.deals freebies", "url": "https://gg.deals/news/freebies/"},
+        {"name": "SteamDB upcoming/free", "url": "https://steamdb.info/upcoming/free/"},
+        {"name": "freeToKeep.gg", "url": "https://freetokeep.gg/", "note": "Fetches official store feeds server-side, ~1 min cache; covers Steam/Epic/GOG/Prime/Stove + bundles"},
+        {"name": "GamerPower", "url": "https://www.gamerpower.com/giveaways"},
+        {"name": "freeGameFindings.ca", "url": "https://freegamefindings.ca/", "note": "Text-only mirror"}
+      ],
+      "signal_presented_as": "curated listing with expiry / 'free to keep' labels",
+      "update_cadence": "near real-time (minutes to hours)",
+      "free_detection_field": "n/a (curated feeds)",
+      "detection_pitfall": "Requires trusting community curation; some entries are subscription/task-gated."
+    }
+  ],
+  "filtering_pitfalls": [
+    {"id": 1, "title": "Free != free-to-keep", "detail": "Price 0 or 'Free' badge is necessary-but-not-sufficient. Exclude always-F2P games (Fortnite, Apex, LoL, PoE, Warframe, etc.) that were never paid."},
+    {"id": 2, "title": "Cannot distinguish F2P vs converted from one snapshot (Steam)", "detail": "Verified: Apex Legends (F2P) and Crusader Kings II (converted to free) both return is_free=true with no price_overview. Track is_free/price False->True flip over time, or use a curated list."},
+    {"id": 3, "title": "Demos / playtests / betas / prologues / showcases", "detail": "e.g. Onimusha Demo, Detroit: Become Human Demo, Far Cry 6 FREE Trial, HITMAN WOA Free Demo, Lords of the Fallen Friend's Pass. Filter by offerType and title tokens (Demo/Trial/Playtest/Beta/Prologue/Showcase/Benchmark/Testing) and by base-game price."},
+    {"id": 4, "title": "Trials / Free Weekend / 'Play Free' (not permanent)", "detail": "Free weekends and trials revert to paid; distinguish 'keep' (Add to Library/Add to Account) from 'play' (temporary access) UI and expiry semantics."},
+    {"id": 5, "title": "DLC / add-ons / Starter Editions mislabeled as games", "detail": "e.g. Epic 'Lost Explorers' Swords Pack' DLC or a free 'Starter Edition'. Filter to BASE_GAME product types; drop ADD_ON/DLC/starter."},
+    {"id": 6, "title": "Bundles / compilations", "detail": "Epic offerType=BUNDLE (e.g. Tomb Raider I-III Remastered) is a legit giveaway but a bundle, not a single game; decide scope."},
+    {"id": 7, "title": "Pay-what-you-want / always-free itch titles", "detail": "No flag for 'became free recently'; requires price-history polling."},
+    {"id": 8, "title": "Region / currency variance", "detail": "A title may be free in one country but not another; pass explicit cc=/country= and note region."},
+    {"id": 9, "title": "Already-owned masking", "detail": "Authenticated accounts won't re-show price 0 for titles already owned; don't infer 'no longer free' from an account that owns the game. Query unauthenticated or track by entitlement."},
+    {"id": 10, "title": "Delisting giveaways", "detail": "Some games are made free right before permanent removal (e.g. MOUTHOLE). Real free-to-keep events but may be short-lived; mark as delisting-edge."},
+    {"id": 11, "title": "Subscription / task gating", "detail": "Prime Gaming requires an active paid sub; some giveaways require task completion. Decide scope before filtering."}
+  ],
+  "examples": [
+    {"game": "We Were Here Together", "store": "Epic Games Store", "window": "2026-08-06 to 2026-08-13", "original_price_usd": "~17.99", "how": "weekly free-to-keep giveaway", "how_verified": "Epic freeGamesPromotions API (verified live this run)"},
+    {"game": "Beacon Pines", "store": "Epic Games Store", "window": "2026-08-06 to 2026-08-13", "original_price_usd": "~19.99", "how": "weekly free-to-keep giveaway", "how_verified": "Epic freeGamesPromotions API (verified live this run)"},
+    {"game": "Caravan SandWitch", "store": "Epic Games Store", "window": "2026-08-13 to 2026-08-20 (upcoming)", "original_price_usd": "~22.99", "how": "upcoming weekly giveaway", "how_verified": "Epic API + GameRant"},
+    {"game": "Ghostrunner 2", "store": "Epic Games Store", "window": "2026-09-10 to 2026-09-24 (upcoming)", "original_price_usd": "~39.99", "how": "upcoming weekly giveaway", "how_verified": "Epic API"},
+    {"game": "Moonlighter", "store": "Steam", "window": "August 2026 (limited)", "original_price_usd": "~24.99", "how": "free-to-keep to celebrate sequel 1.0", "how_verified": "GameRant / TheGamer"},
+    {"game": "Breathedge", "store": "Steam", "window": "August 2026", "original_price_usd": "~24.99", "how": "free-to-keep giveaway", "how_verified": "GameRant"},
+    {"game": "Wobbly Heist, Rise of Eurevia, One Death at a Time, The Colors of Love - Re-Colored", "store": "Steam", "window": "July 2026", "original_price_usd": "were paid", "how": "permanent paid-to-free conversions", "how_verified": "Archyde / GameRant summary"},
+    {"game": "GRIT (2025 action roguelite)", "store": "Steam", "window": "2026", "original_price_usd": "was paid", "how": "made permanently $0.00", "how_verified": "GameRant"},
+    {"game": "Pong Temple, Vivat Sloboda", "store": "Steam", "window": "2026", "original_price_usd": "Pong Temple ~3", "how": "permanent free conversions", "how_verified": "VGTimes"},
+    {"game": "Nexus: The Jupiter Incident", "store": "GOG", "window": "2026-07-03 to 2026-07-06", "original_price_usd": "~9.99", "how": "48h free-to-keep during Summer Sale", "how_verified": "gg.deals / PC Gamer"},
+    {"game": "(historic ref) Crusader Kings II", "store": "Steam", "window": "October 2019", "original_price_usd": "39.99 base", "how": "permanent paid-to-free (base game)", "how_verified": "Steam appdetails is_free=true; widely documented"}
+  ],
+  "recommendations": [
+    "Primary automated feed: Epic freeGamesPromotions API (free, no auth, structured, deterministic weekly). Filter discountPercentage==0 + offerType==BASE_GAME + exclude demo/trial tokens.",
+    "Cross-store coverage: poll r/FreeGameFindings JSON + gg.deals freebies + SteamDB /upcoming/free/ + freeToKeep.gg to catch Steam/GOG/Prime/itch giveaways with no clean store API.",
+    "Steam paid-to-free detection: persist appdetails.is_free + price_overview per appid over time; False->True flip = permanent conversion. Cross-check SteamDB.",
+    "Maintain an exclusion blocklist: native-F2P anchors + DLC/Starter/Bundle/PE offer types + demo/trial title regex.",
+    "Prime Gaming: requires auth + active sub; use browser automation against luna.amazon.com/claims/home with user creds, or rely on aggregators.",
+    "itch.io: only practical via on-sale page polling + price diffing; lowest automation value."
+  ],
+  "open_questions": [
+    "No single official cross-store free-to-keep API exists; a robust tracker must fuse 2-4 sources.",
+    "Prime Gaming has no stable public JSON feed; the old gamesdb.prime.amazon.com endpoint is unofficial and fragile.",
+    "SteamDB scraping is blocked from plain HTTP on some pages (JS/anti-bot); confirm a browser-based fetch if SteamDB is used as the Steam source of truth.",
+    "itch.io 'paid but temporarily free' has no programmatic differentiator; needs polling-based history.",
+    "Some giveaways are subscription/task-gated; decide scope before building the filter."
+  ]
+}

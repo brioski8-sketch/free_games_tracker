@@ -1,0 +1,40 @@
+# free_games_tracker configuration
+# Copy to your own config; never commit secrets here.
+
+currency_base: USD
+allow_bundles: false
+allow_sub_gated: false
+min_original_price: 0
+sort_mode: score        # score | newest | value
+
+collectors:
+  epic: true
+  steam_flip: true
+  reddit: true
+  gog: false           # mostly always-free; off by default, easy to enable
+  ggdeals: false
+  steamdb: false
+  freetokeep: false
+  prime: false
+  itch: false
+
+epic:
+  locale: en-US
+  country: US
+
+steam:
+  cc: us
+  # Curated watchlist to change-track for paid→free conversions. Extend freely.
+  watched_appids: [340580, 1158310, 1238840, 1174180]
+
+reddit:
+  limit: 25
+
+http:
+  timeout: 20
+  retries: 2
+
+notify:
+  output_dir: reports/
+
+state_db: state.db

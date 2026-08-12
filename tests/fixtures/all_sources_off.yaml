@@ -1,0 +1,6 @@
+# Config that turns every currently-free source off so the collector returns [].
+# Used by test_weekly_report.py to exercise the "no current free games" branch.
+collectors:
+  epic: false
+  gog: false
+  reddit: false

@@ -1,28 +1,22 @@
-# Secrets — never commit real credentials
+# Secrets — never commit API tokens or credentials
 .env
 .env.*
-*.env
-!*.env.example
+!.env.example
 
 # Runtime state + generated output (not source)
 state.db
-state.db-*
 reports/
 *.sqlite
 *.sqlite3
 
-# Python bytecode / caches
+# Python
 __pycache__/
 *.py[cod]
+.venv/
+venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-
-# Virtualenvs
-.venv/
-venv/
-env/
-virtualenv/
 
 # Editors / OS
 .vscode/

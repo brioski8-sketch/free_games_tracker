@@ -1,5 +1,10 @@
 # free_games_tracker
 
+> Located in **`.hermes/final_games_tracker/`** — the self-contained deployable
+> snapshot of the tracker plus the weekly Telegram report script
+> (`weekly_report.py`). `cd .hermes/final_games_tracker` before running any of
+> the commands below.
+
 Detect **paid PC games that became available for free** (free-to-keep giveaways and
 permanent paid→free conversions) and report them with enough metadata to act on
 (claim link, original price, claim window).
@@ -68,24 +73,6 @@ output). The report shows two sections:
 
 A committed sample report (from the offline fixture snapshot) is in
 `examples/sample-report.md`.
-
-## Environment variables
-
-The core pipeline runs with **no credentials and no environment variables** —
-all collectors use public, unauthenticated APIs and the default notification
-is a file/stdout write. **Nothing is read from the environment** by the current
-code, so there is no API key, Telegram bot token, or secret to set to get
-started.
-
-Optional, if you wire up notification delivery yourself:
-
-| Variable | Purpose |
-|---|---|
-| *(any)* | `notify.py::notify_all(records, config)` is the single insertion point for chat/email/webhook delivery. If you add an adapter that authenticates, read your tokens/settings from the environment there — never hard-code them, and never commit them. `config.yaml`, the `.gitignore` (`.env`), and this README all assume secrets live outside the repo. |
-
-To keep secrets out of the repo, put any real credentials (Telegram bot token,
-webhook URL, etc.) in an `.env` file (gitignored) and load them only inside
-your `notify_all` adapter.
 
 ## Filter logic (the important part)
 
@@ -177,6 +164,65 @@ The CLI writes the markdown report and `free_games.json`. For chat/email deliver
 `notify.py` (`notify_all(records, config)` is the insertion point) or point a webhook at the
 produced JSON. See `main.py --notify` for the hook.
 
+## Weekly Telegram report (`weekly_report.py`)
+
+A self-contained sender that collects *currently free* games (via
+`free_games_collector.get_current_free_games`) and posts a formatted Telegram
+HTML message (title, availability window, direct claim URL) to a configured chat.
+
+It reads the same **data sources** as the tracking pipeline — the [Epic](#1-epic)
+`freeGamesPromotions` API, the [GOG](#3-gog) catalog API, and the
+[r/FreeGameFindings](#4-reddit) community feed — and applies the same
+normalize/dedupe/filter contract, so only genuine paid→free giveaways are posted.
+(Steam paid→free *conversion* detection is intentionally excluded: it is a
+stateful change-tracking alert, not a "free right now" listing.)
+
+```bash
+# run from the deployable folder
+cd .hermes/final_games_tracker
+pip install -r requirements.txt        # adds python-dotenv
+cp .env.example .env                    # then fill in your real token + chat id
+
+python weekly_report.py --dry-run       # print the exact message, don't send
+python weekly_report.py --offline --dry-run   # same, from committed fixtures (no network)
+python weekly_report.py                 # collect + send to Telegram
+```
+
+Credentials come from environment variables or a gitignored `.env` (loaded with
+`python-dotenv`); environment variables always win. Neither the token nor the chat id is
+ever logged or committed.
+
+```env
+TELEGRAM_BOT_TOKEN=<bot token from @BotFather>
+TELEGRAM_CHAT_ID=<chat or channel id>
+```
+
+`--dry-run` prints the exact outgoing message to stdout and needs **no** credentials, so
+you can preview the formatting before wiring up a bot. Example output:
+
+```
+<b>🎮 Free games this week — 2026-08-12</b>
+3 paid games now free — act before they expire:
+• <b>Moonlighter is FREE on Steam (limited time)</b> (Aggregator) — free from 2026-08-06 · <a href="https://www.reddit.com/r/FreeGameFindings/comments/ab12/moonlighter_is_free_on_steam_limited_time/">Claim</a>
+• <b>Beacon Pines</b> (Epic) — free 2026-08-06 → 2026-08-13 · <a href="https://store.epicgames.com/en-US/beacon-pines">Claim</a>
+• <b>We Were Here Together</b> (Epic) — free 2026-08-06 → 2026-08-13 · <a href="https://store.epicgames.com/en-US/we-were-here-together">Claim</a>
+```
+
+Exit codes are machine-friendly:
+
+| Code | Meaning |
+|---|---|
+| `0` | sent to Telegram, or `--dry-run` printed |
+| `1` | runtime failure — no current free games, network trouble, or Telegram API rejection |
+| `2` | configuration failure — missing credentials needed to send |
+
+> **Secrets:** never commit a real `.env`. The bot token is a credential — anyone holding it
+> can post to your bot. `.env` is gitignored; only the placeholder `.env.example` is committed.
+
+The canonical script lives at `.hermes/final_games_tracker/weekly_report.py`; the repo-root
+`weekly_report.py` is a thin shim so `python weekly_report.py ...` works from the repo root
+(see `tests/test_weekly_report.py` for the covered contract).
+
 ## Testing
 
 ```bash
@@ -193,11 +239,16 @@ pytest -q
 
 ## Project layout
 
+The deployable folder is **`.hermes/final_games_tracker/`** in the repository root:
+
 ```
-main.py                 CLI entrypoint
-config.yaml             Configuration (copy to your own; never commit secrets)
-requirements.txt        Dependencies
-free_games_tracker/
+.hermes/final_games_tracker/   self-contained deployable folder (tracker + weekly report)
+  main.py                 CLI entrypoint
+  weekly_report.py        Telegram free-games report (reuses pipeline; --dry-run preview)
+  config.yaml             Configuration (copy to your own; never commit secrets)
+  requirements.txt        Dependencies
+  .env.example            Template for TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID (copy to .env)
+  free_games_tracker/
   __init__.py
   model.py              Canonical record dataclass + constants
   config.py             Config loading / validation

@@ -16,7 +16,14 @@ cover task-gating, only subscription — tasks pass unless title looks non-game)
 `confidence = medium` (human-curated community feed; r/FGF is the gold standard
 for cross-store free-to-keep coverage).
 
-Reddit may rate-limit unauthenticated JSON (HTTP 403); failures degrade to `[]`.
+Reddit may rate-limit unauthenticated JSON (HTTP 403). Since Aug 2026 the JSON
+endpoint 403-blocks this host persistently, so `collect()` falls back to the
+public RSS feed (`https://www.reddit.com/r/FreeGameFindings/.rss`, plain UA),
+which Reddit still serves. RSS entries are converted into the same
+``{data: {children: [{data: <post>}]}}`` shape the JSON path parses, so one
+parsing implementation serves both. RSS gives no ``link_flair_text`` and a
+truncated HTML ``content`` body in place of ``selftext``; the original-price
+parser runs over the de-HTML-ified content so "was $X" framing still works.
 
 Original-price handling (see task B1): the Reddit payload has no authoritative
 per-post MSRP field, so we parse an expected pre-free price from the post's
@@ -29,12 +36,14 @@ passing row from metadata that carries no price evidence.
 from __future__ import annotations
 
 import datetime as _dt
+import html
 import re
 from typing import Any, Dict, List, Optional
 
-from ..httpclient import FetchError, fetch_json
+from ..httpclient import FetchError, fetch_json, fetch_text
 
 API = "https://www.reddit.com/r/FreeGameFindings/hot.json"
+RSS_URL = "https://www.reddit.com/r/FreeGameFindings/.rss"
 
 # Currency tokens we can resolve to an ISO code from a price mention.
 _CURRENCY = {"$": "USD", "US$": "USD", "\u20ac": "EUR", "\u00a3": "GBP"}
@@ -71,12 +80,17 @@ _FREE_FRAME = re.compile(
 _SKIP_FLAIRS = frozenset({"f2p to paid"})
 
 
+_MSRP_CEILING = 199.99  # above this a "was $X" parse is noise, not a real MSRP
+
+
 def _parse_original_price(post: Dict[str, Any]) -> Optional[tuple[float, str]]:
     """Parse a demonstrable pre-promotion MSRP from a post's title/selftext.
 
     Returns ``(price, iso_currency)`` or ``None`` when no explicitly-framed
-    paid price is present. ``None`` → caller emits ``original_price = 0.0`` so
-    the filter rejects the post as ``f2p_never_paid`` (no fabricated row).
+    paid price is present. Parsed prices above ``_MSRP_CEILING`` are treated
+    as parse noise (bundle totals, ids, dates misread) and discarded —
+    ``None`` → caller emits ``original_price = 0.0`` so the filter rejects the
+    post as ``f2p_never_paid`` (no fabricated row).
     """
     hay = " ".join(
         p for p in ((post.get("title") or ""), (post.get("selftext") or "")) if p
@@ -86,8 +100,73 @@ def _parse_original_price(post: Dict[str, Any]) -> Optional[tuple[float, str]]:
     for pat in (_P1, _P2, _FREE_FRAME):
         m = pat.search(hay)
         if m:
-            return float(m.group("amt")), _CURRENCY.get(m.group("cur") or "$", "USD")
+            amt = float(m.group("amt"))
+            if amt <= _MSRP_CEILING:
+                return amt, _CURRENCY.get(m.group("cur") or "$", "USD")
     return None
+
+
+def _fetch_rss_posts(limit: int, timeout: int, retries: int) -> Optional[list[dict]]:
+    """Fallback: fetch the public RSS feed and convert entries to JSON-API post
+    shape. Returns the ``children`` list or ``None`` when RSS also fails (the
+    caller then degrades to ``[]`` as before)."""
+    try:
+        xml_text = fetch_text(RSS_URL, timeout=timeout, retries=retries)
+    except FetchError:
+        return None
+    return _parse_rss_entries(xml_text)[:limit]
+
+
+def _parse_rss_entries(xml_text: str) -> list[dict]:
+    """Parse a Reddit ``.rss`` Atom feed into JSON-API ``children`` shape.
+
+    Each ``<entry>`` becomes ``{"data": {...post fields...}}``. Reddit's RSS
+    omits flairs; ``link_flair_text`` is left empty so the normal filter chain
+    applies. The HTML ``content`` (Reddit serves escaped HTML) is un-escaped
+    and tag-stripped into ``selftext`` so the MSRP framing parser still sees
+    "was $X" text. Post ids come from the ``t3_<id>`` entry id; the permalink
+    from the ``<link href>``.
+    """
+    out: list[dict] = []
+    for entry in re.findall(r"<entry>(.*?)</entry>", xml_text, re.S):
+
+        def _tag(t: str, e: str = entry) -> Optional[str]:
+            m = re.search(rf"<{t}[^>]*>(.*?)</{t}>", e, re.S)
+            return m.group(1) if m else None
+
+        post_id_m = re.search(r"<id>t3_([0-9a-z]+)</id>", entry)
+        if not post_id_m:
+            continue
+        link_m = re.search(r'<link[^>]*href="([^"]+)"', entry)
+        title = _tag("title") or ""
+        # content is double-escaped HTML; unescape entities then strip tags
+        raw_content = _tag("content") or ""
+        text = html.unescape(html.unescape(raw_content))
+        # capture the store's official offer link from the "[link]" anchor
+        # BEFORE tag-stripping destroys the hrefs
+        offer_href_m = re.search(
+            r'<a href="(https?://(?!www\.reddit\.com|old\.reddit\.com|redd\.it|'
+            r'i\.redd\.it|imgur\.com)[^"]+)"[^>]*>\s*\[link\]',
+            text or raw_content,
+        )
+        text = re.sub(r"<[^>]+>", " ", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        published = _tag("published")
+        out.append({"data": {
+            "id": post_id_m.group(1),
+            "title": title,
+            "selftext": text,
+            "link_flair_text": "",
+            "permalink": link_m.group(1).replace("https://www.reddit.com", "")
+            if link_m else f"/r/FreeGameFindings/comments/{post_id_m.group(1)}/",
+            "created_utc": published,
+            "preview": None,
+            # RSS-only: the store's own offer URL, extracted for the filter's
+            # FGF-vouch path (Reddit's JSON carries flair + MSRP text; RSS
+            # carries neither, so the offer link is the authenticity signal).
+            "fgf_offer_url": offer_href_m.group(1) if offer_href_m else None,
+        }})
+    return out
 
 
 def collect(cfg: Dict[str, Any], payload: Optional[dict] = None) -> List[Dict[str, Any]]:
@@ -95,8 +174,8 @@ def collect(cfg: Dict[str, Any], payload: Optional[dict] = None) -> List[Dict[st
 
     ``payload`` (optional) is an already-fetched Reddit ``hot.json`` response so
     the offline/fixture path exercises the SAME parsing logic as live. When
-    omitted, the feed is fetched over the network (degrades to ``[]`` on
-    rate-limit/HTTP error).
+    omitted, the feed is fetched over the network; on JSON failure (403 block)
+    the public RSS feed is tried before degrading to ``[]``.
     """
     http = cfg.get("http") or {}
     limit = (cfg.get("reddit") or {}).get("limit", 25)
@@ -106,7 +185,13 @@ def collect(cfg: Dict[str, Any], payload: Optional[dict] = None) -> List[Dict[st
         try:
             payload = fetch_json(url, timeout=http.get("timeout", 20), retries=http.get("retries", 2))
         except FetchError:
-            return []
+            # JSON endpoint 403-blocked (persistent since Aug 2026) — fall back
+            # to the public RSS feed, which Reddit still serves to plain UAs.
+            children = _fetch_rss_posts(
+                limit, http.get("timeout", 20), http.get("retries", 2))
+            if children is None:
+                return []
+            payload = {"data": {"children": children}}
 
     body: dict = payload or {}  # non-None from here on (fetch path already handled)
     children = body.get("data", {}).get("children") or []
@@ -131,6 +216,12 @@ def collect(cfg: Dict[str, Any], payload: Optional[dict] = None) -> List[Dict[st
             continue
         permalink = post.get("permalink") or ""
         price_parsed = _parse_original_price(post)
+        fgf_offer_url = post.get("fgf_offer_url")
+        # `(Game)` tag on a raw r/FGF title = the community's "full game"
+        # marker. Captured here (raw title intact) because normalize strips
+        # the tag prefix from the display title — the filter's vouch check
+        # reads this flag instead of pattern-matching the cleaned title.
+        is_game_tag = "(game)" in title.lower()
         out.append({
             "store": "aggregator",
             "reddit_post_id": post.get("id"),
@@ -151,5 +242,10 @@ def collect(cfg: Dict[str, Any], payload: Optional[dict] = None) -> List[Dict[st
             "detected_at": now_iso,
             "confidence": "medium",
             "keep_action": True,
+            # RSS fallback path: official store offer link extracted from the
+            # post body. Drives the filter's FGF-vouch exception (below) since
+            # RSS posts carry no flair or selftext MSRP framing.
+            "fgf_offer_url": fgf_offer_url,
+            "fgf_game_tag": is_game_tag,
         })
     return out

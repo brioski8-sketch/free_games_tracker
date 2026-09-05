@@ -82,8 +82,20 @@ def passes(rec: GameRecord, cfg) -> FilterResult:
         return FilterResult(False, reason)
 
     # Criterion 2 — had a paid price before the promo.
+    # Exception (FGF vouch): r/FreeGameFindings posts that carry a `(Game)` tag
+    # AND an official store offer URL are community-vouched paid→free
+    # giveaways even when no MSRP text is parseable (the RSS fallback feed
+    # strips selftext/flair, so "was $X" framing is often unavailable there).
+    # The offer URL — not reddit.com — is the authenticity signal. Discussion/
+    # PSA/megathread posts never carry a store link + Game tag, so they still
+    # fail here as f2p_never_paid.
     if (rec.original_price or 0.0) <= 0:
-        return FilterResult(False, "f2p_never_paid")
+        extra = rec.extra or {}
+        fgf_url = extra.get("fgf_offer_url") or ""
+        if not (rec.store == "aggregator" and fgf_url
+                and extra.get("fgf_game_tag")
+                and extra.get("source_feed") == "r_fgf_hot"):
+            return FilterResult(False, "f2p_never_paid")
 
     # Optional MSRP floor (drop 99¢ shovelware).
     if (rec.original_price or 0.0) < float(cfg.get("min_original_price", 0)):

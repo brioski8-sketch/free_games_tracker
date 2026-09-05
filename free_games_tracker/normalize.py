@@ -20,9 +20,18 @@ _WS = re.compile(r"\s+")
 _CONF = {"high": 3, "medium": 2, "low": 1}
 
 
+_TITLE_TAG = re.compile(
+    r"^\s*\[[^\]]{1,40}\]\s*(?:\(Game\)|\(Other\)|\(DLC\)|\(Beta\))?\s*",
+    re.IGNORECASE,
+)
+
+
 def _norm_title(title: str) -> str:
     """Case/whitespace-collapsed title for matching; keeps display form separately."""
     t = title.strip()
+    # r/FGF titles lead with a store tag ("[Steam] (Game) Foo") — strip it so
+    # Reddit records display (and dedupe against) the plain game name.
+    t = _TITLE_TAG.sub("", t)
     t = _TRAILING_SUFFIX.sub("", t)
     return _WS.sub(" ", t).strip()
 
@@ -66,8 +75,8 @@ def normalize(raw: List[Dict[str, Any]]) -> List[GameRecord]:
             game_id=game_id,
             title=_norm_title(title),
             store=store,
-            store_url=r.get("store_url") or "",
-            offer_url=r.get("offer_url") or "",
+            store_url=r.get("fgf_offer_url") or r.get("store_url") or "",
+            offer_url=r.get("fgf_offer_url") or r.get("offer_url") or "",
             original_price=original_price,
             original_price_currency=r.get("original_price_currency") or r.get("currency", "USD"),
             free_since=(
@@ -106,6 +115,10 @@ def dedupe(records: List[GameRecord]) -> List[GameRecord]:
     - end_date: latest (most permissive) observed
     - original_price: prefer the larger, earliest-seen paid price
     - source_feed: concatenate feeds that confirmed it
+
+    After same-id merging, a second cross-store pass folds records whose
+    normalized titles AND offer hosts match (e.g. the same Epic giveaway seen
+    via Epic's official feed and via r/FGF would otherwise appear twice).
     """
     merged: Dict[str, GameRecord] = {}
 
@@ -118,8 +131,33 @@ def dedupe(records: List[GameRecord]) -> List[GameRecord]:
         # merge into a new record to avoid mutating inputs
         merged[rec.game_id] = _merge(cur, rec)
 
-    ordered = sorted(merged.values(), key=lambda r: (r.store, r.game_id))
+    # cross-store pass: same game reported by different feeds. Requires a
+    # non-empty offer host on both sides — records without a resolvable offer
+    # URL (or synthetic/test records sharing a placeholder title) must not
+    # collapse on title alone.
+    by_sig: Dict[tuple, List[GameRecord]] = {}
+    for rec in merged.values():
+        host = _offer_host(rec.offer_url)
+        if host:
+            by_sig.setdefault((_norm_title(rec.title).lower(), host), []).append(rec)
+        else:
+            by_sig.setdefault((rec.game_id,), []).append(rec)
+    final: Dict[str, GameRecord] = {}
+    for group in by_sig.values():
+        best = group[0]
+        for other in group[1:]:
+            best = _merge(best, other)  # _merge keeps the best evidence
+        final[best.game_id] = best
+
+    ordered = sorted(final.values(), key=lambda r: (r.store, r.game_id))
     return ordered
+
+
+def _offer_host(url: str) -> str:
+    """Hostname of an offer URL (for cross-store same-giveaway detection)."""
+    m = re.match(r"https?://([^/]+)", url or "")
+    return (m.group(1).removeprefix("www.").removeprefix("store.")
+            if m else "")
 
 
 def _merge(a: GameRecord, b: GameRecord) -> GameRecord:

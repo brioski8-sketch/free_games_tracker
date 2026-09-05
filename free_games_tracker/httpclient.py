@@ -33,6 +33,22 @@ def fetch_json(
     Retries on transient errors (5xx, timeouts). Raises FetchError on final
     failure so callers can degrade gracefully.
     """
+    body = fetch_text(url, timeout=timeout, retries=retries, headers=headers)
+    return json.loads(body)
+
+
+def fetch_text(
+    url: str,
+    *,
+    timeout: int = 20,
+    retries: int = 2,
+    headers: Optional[dict] = None,
+) -> str:
+    """Fetch a URL and return the raw response body as text.
+
+    Same retry/error contract as fetch_json; callers that need non-JSON
+    payloads (RSS, HTML) use this so UA/retry behavior stays centralized.
+    """
     hdrs = {"User-Agent": USER_AGENT, "Accept": "application/json"}
     if headers:
         hdrs.update(headers)
@@ -42,8 +58,7 @@ def fetch_json(
         req = urllib.request.Request(url, headers=hdrs)
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
-                body = resp.read().decode("utf-8", errors="replace")
-                return json.loads(body)
+                return resp.read().decode("utf-8", errors="replace")
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as exc:
             last_err = exc
             code = getattr(exc, "code", None)

@@ -164,56 +164,71 @@ The CLI writes the markdown report and `free_games.json`. For chat/email deliver
 `notify.py` (`notify_all(records, config)` is the insertion point) or point a webhook at the
 produced JSON. See `main.py --notify` for the hook.
 
-## Weekly Telegram report (`weekly_report.py`)
+## Weekly free-games report (`weekly_report.py`)
 
 A self-contained sender that collects *currently free* games (via
-`free_games_collector.get_current_free_games`) and posts a formatted Telegram
-HTML message (title, availability window, direct claim URL) to a configured chat.
+`free_games_collector.get_current_free_games`) and delivers a report. Two
+surfaces — **HTML email is the primary mode**:
+
+- **HTML email** (`--email`) — an HTML document with a table of free games,
+  each game title **hyperlinked directly to its claim/store page**, the
+  **store providing the giveaway**, and the availability window. Delivered
+  via the AgentMail SDK.
+- **Telegram** (default, legacy) — the original compact HTML message.
 
 It reads the same **data sources** as the tracking pipeline — the [Epic](#1-epic)
 `freeGamesPromotions` API, the [GOG](#3-gog) catalog API, and the
 [r/FreeGameFindings](#4-reddit) community feed — and applies the same
-normalize/dedupe/filter contract, so only genuine paid→free giveaways are posted.
+normalize/dedupe/filter contract, so only genuine paid→free giveaways are reported.
 (Steam paid→free *conversion* detection is intentionally excluded: it is a
 stateful change-tracking alert, not a "free right now" listing.)
+
+The store shown for each game comes from the collector's `source` when it is
+authoritative (Epic/GOG/Steam adapters); otherwise it is derived from the claim
+URL host, so an r/FGF aggregate entry still tells you *which* store is giving the
+game away (Steam, GOG, itch.io, Alienware Arena, ...).
 
 ```bash
 # run from the deployable folder
 cd .hermes/final_games_tracker
 pip install -r requirements.txt        # adds python-dotenv
-cp .env.example .env                    # then fill in your real token + chat id
 
-python weekly_report.py --dry-run       # print the exact message, don't send
-python weekly_report.py --offline --dry-run   # same, from committed fixtures (no network)
-python weekly_report.py                 # collect + send to Telegram
+python weekly_report.py --email --dry-run            # print the HTML, don't send
+python weekly_report.py --email                      # collect + email the HTML report
+python weekly_report.py --email --offline --dry-run  # from committed fixtures (no network)
+python weekly_report.py --dry-run                    # print the Telegram message instead
 ```
 
-Credentials come from environment variables or a gitignored `.env` (loaded with
-`python-dotenv`); environment variables always win. Neither the token nor the chat id is
-ever logged or committed.
+Credentials: the AgentMail key is resolved from the environment,
+`~/.hermes/config.yaml` (`mcp_servers.agentmail.env.AGENTMAIL_API_KEY` or a
+top-level `env:` block), or `~/.hermes/.env` — environment variables always win.
+The Telegram path additionally reads `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`
+from the environment or a gitignored `.env` (loaded with `python-dotenv`).
+Secrets are never logged or committed.
 
 ```env
-TELEGRAM_BOT_TOKEN=<bot token from @BotFather>
-TELEGRAM_CHAT_ID=<chat or channel id>
+AGENTMAIL_API_KEY=<key>            # HTML email delivery (primary)
+TELEGRAM_BOT_TOKEN=<bot token>     # only for the Telegram path
+TELEGRAM_CHAT_ID=<chat or id>      # only for the Telegram path
 ```
 
-`--dry-run` prints the exact outgoing message to stdout and needs **no** credentials, so
-you can preview the formatting before wiring up a bot. Example output:
+Run the email path under the Hermes venv (it has the `agentmail` SDK):
 
+```bash
+/home/thebevans/.hermes/hermes-agent/venv/bin/python3 weekly_report.py --email
 ```
-<b>🎮 Free games this week — 2026-08-12</b>
-3 paid games now free — act before they expire:
-• <b>Moonlighter is FREE on Steam (limited time)</b> (Aggregator) — free from 2026-08-06 · <a href="https://www.reddit.com/r/FreeGameFindings/comments/ab12/moonlighter_is_free_on_steam_limited_time/">Claim</a>
-• <b>Beacon Pines</b> (Epic) — free 2026-08-06 → 2026-08-13 · <a href="https://store.epicgames.com/en-US/beacon-pines">Claim</a>
-• <b>We Were Here Together</b> (Epic) — free 2026-08-06 → 2026-08-13 · <a href="https://store.epicgames.com/en-US/we-were-here-together">Claim</a>
-```
+
+`--dry-run` prints the exact outgoing payload (HTML for `--email`, the Telegram
+message otherwise) to stdout and needs **no** credentials, so you can preview the
+formatting before wiring anything up. The email is multipart: an HTML body plus a
+plain-text alternative.
 
 Exit codes are machine-friendly:
 
 | Code | Meaning |
 |---|---|
-| `0` | sent to Telegram, or `--dry-run` printed |
-| `1` | runtime failure — no current free games, network trouble, or Telegram API rejection |
+| `0` | emailed the report (or `--dry-run` printed) |
+| `1` | runtime failure — no current free games, network trouble, or send rejection |
 | `2` | configuration failure — missing credentials needed to send |
 
 > **Secrets:** never commit a real `.env`. The bot token is a credential — anyone holding it

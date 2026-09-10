@@ -231,14 +231,31 @@ _HOST_STORE = (
 
 _SOURCE_STORE = {"epic": "Epic Games", "gog": "GOG", "steam": "Steam"}
 
+# Title-substring → store, as a last resort for aggregator entries whose claim
+# URL is a community post (e.g. "Moonlighter is FREE on Steam (limited time)").
+_TITLE_STORE = (
+    ("on steam", "Steam"),
+    ("steam key", "Steam"),
+    ("on epic", "Epic Games"),
+    ("epic games", "Epic Games"),
+    ("on gog", "GOG"),
+    ("gog.com", "GOG"),
+    ("itch.io", "itch.io"),
+    ("prime gaming", "Prime Gaming"),
+)
+
 
 def store_label(game: Dict[str, Any]) -> str:
     """Best-effort human store name for a collector dict.
 
-    Prefers the collector's ``source`` (authoritative for Epic/GOG/Steam
-    adapters); otherwise derives the storefront from the claim URL host so an
-    r/FGF aggregate entry still tells the reader *which* store is giving the
-    game away. Falls back to "Other / giveaway site".
+    Resolution order, most authoritative first:
+
+    1. the collector's ``source`` (authoritative for the Epic/GOG/Steam adapters);
+    2. the claim URL host (so an r/FGF aggregate entry that links straight to a
+       storefront still names it);
+    3. a store hinted in the title (e.g. "... is FREE on Steam"), for community
+       posts whose URL is a Reddit thread rather than a store page;
+    4. "Other / giveaway site".
     """
     source = str(game.get("source") or "").strip().lower()
     if source in _SOURCE_STORE:
@@ -248,6 +265,12 @@ def store_label(game: Dict[str, Any]) -> str:
     for host, label in _HOST_STORE:
         if host in url:
             return label
+
+    title = str(game.get("title") or "").strip().lower()
+    for hint, label in _TITLE_STORE:
+        if hint in title:
+            return label
+
     return "Other / giveaway site"
 
 

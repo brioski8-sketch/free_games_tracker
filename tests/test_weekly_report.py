@@ -85,6 +85,26 @@ def test_store_label_unknown_host_falls_back():
     assert wr.store_label(game) == "Other / giveaway site"
 
 
+def test_store_label_title_hint_for_community_post():
+    """A Reddit-thread claim URL has no store host — fall back to the title hint."""
+    game = {
+        "title": "Moonlighter is FREE on Steam (limited time)",
+        "url": "https://www.reddit.com/r/FreeGameFindings/comments/ab12/x/",
+        "source": "aggregator",
+    }
+    assert wr.store_label(game) == "Steam"
+
+
+def test_store_label_url_host_beats_title_hint():
+    """The URL host is more reliable than a title hint."""
+    game = {
+        "title": "Some game is free on Steam",
+        "url": "https://www.gog.com/en/game/some-game",
+        "source": "aggregator",
+    }
+    assert wr.store_label(game) == "GOG"
+
+
 def test_store_label_handles_missing_url():
     assert wr.store_label({"title": "X", "source": "aggregator"}) == "Other / giveaway site"
 

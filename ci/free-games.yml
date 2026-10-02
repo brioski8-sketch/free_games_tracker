@@ -1,0 +1,39 @@
+name: free-games-tracker
+
+on:
+  schedule:
+    # Thu 15:05 UTC — just after Epic's weekly free-game drop (Thu 15:00 UTC)
+    - cron: "5 15 * * 4"
+    # Daily morning digest — catches Steam/GOG/reddit giveaways outside Epic's slot
+    - cron: "30 9 * * *"
+  workflow_dispatch: {}   # manual trigger
+
+permissions:
+  contents: read   # read-only: we upload artifacts, we do not commit into the repo
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run the pipeline (live sources)
+        run: python main.py --config config.yaml --digest-only
+
+      - name: Show produced report
+        run: cat reports/free-games-*.md
+
+      - name: Upload reports + state as build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: free-games-reports
+          path: |
+            reports/
+            state.db

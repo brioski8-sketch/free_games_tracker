@@ -141,10 +141,17 @@ See `config.yaml` for all options:
 
 All three options invoke the same `python main.py --config config.yaml` entrypoint.
 
-### A. GitHub Actions (recommended — see `.github/workflows/free-games.yml`)
+### A. GitHub Actions (see `ci/free-games.yml`)
 Runs on a schedule (Thu 15:05 UTC right after Epic's weekly drop + a daily digest) and on
-`workflow_dispatch`. It installs deps, runs the pipeline, uploads `reports/` as a build
-artifact and commits the markdown report back to the repo so you get a git history of finds.
+`workflow_dispatch`. It installs deps, runs the pipeline, and uploads `reports/` and
+`state.db` as **build artifacts** — it does **not** commit anything back to the repo
+(`permissions: contents: read`).
+
+> **Why the file is at `ci/` and not `.github/workflows/`.** Pushing anything under
+> `.github/workflows/` requires a token with the `workflow` scope, and the account token
+> only carries `gist, read:org, repo`. Keeping the working copy at `ci/` versions the
+> automation without needing that scope. To actually enable it, re-auth with the extra
+> scope and move the file to `.github/workflows/free-games.yml`.
 
 ### B. Local cron (self-hosted, e.g. this WSL box)
 ```cron

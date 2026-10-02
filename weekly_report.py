@@ -58,7 +58,27 @@ from free_games_collector import get_current_free_games
 TELEGRAM_API = "https://api.telegram.org/bot{token}/sendMessage"
 SEND_TIMEOUT_SECONDS = 20
 
-DEFAULT_EMAIL_TO = "brioski8@gmail.com"
+def default_email_to() -> str:
+    """The report recipient, read at CALL time rather than import time.
+
+    A personal address must not sit in published source, so it lives in the environment.
+    It has to be resolved lazily: the .env file is loaded inside main(), after this
+    module is imported, so an import-time os.environ.get() would always read empty.
+
+    Falls back to ~/.hermes/.env the same way get_agentmail_api_key() resolves the API
+    key, because the cron launcher does not source that file.
+    """
+    val = os.environ.get("FREE_GAMES_EMAIL_TO", "").strip()
+    if val:
+        return val
+    try:
+        with open(os.path.expanduser("~/.hermes/.env"), encoding="utf-8") as fh:
+            for line in fh:
+                if line.startswith("FREE_GAMES_EMAIL_TO="):
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return ""
 DEFAULT_EMAIL_FROM = "agentvi@agentmail.to"
 
 
@@ -91,8 +111,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--to",
-        default=DEFAULT_EMAIL_TO,
-        help=f"Recipient email address (default: {DEFAULT_EMAIL_TO}).",
+        default=None,
+        help="Recipient email address (default: FREE_GAMES_EMAIL_TO).",
     )
     p.add_argument(
         "--from-inbox",
@@ -441,7 +461,7 @@ def send_email(
     html_body: str,
     text_body: str,
     *,
-    to: str = DEFAULT_EMAIL_TO,
+    to: str = "",
     from_inbox: str = DEFAULT_EMAIL_FROM,
 ) -> str:
     """Send the HTML report via the AgentMail SDK. Returns the message id."""
@@ -450,6 +470,14 @@ def send_email(
         raise EmailSendError(
             "missing AGENTMAIL_API_KEY — set it in the environment, "
             "~/.hermes/config.yaml, or ~/.hermes/.env"
+        )
+    # The recipient is configuration, not source: a personal address does not belong in a
+    # published repo, so it resolves from FREE_GAMES_EMAIL_TO or an explicit --to.
+    to = to or default_email_to()
+    if not to:
+        raise EmailSendError(
+            "no recipient — set FREE_GAMES_EMAIL_TO (or pass --to). The address is "
+            "deliberately not defaulted in the source."
         )
 
     try:

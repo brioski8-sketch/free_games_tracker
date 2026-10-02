@@ -222,7 +222,7 @@ TELEGRAM_CHAT_ID=<chat or id>      # only for the Telegram path
 Run the email path under the Hermes venv (it has the `agentmail` SDK):
 
 ```bash
-/home/thebevans/.hermes/hermes-agent/venv/bin/python3 weekly_report.py --email
+~/.hermes/hermes-agent/venv/bin/python3 weekly_report.py --email
 ```
 
 `--dry-run` prints the exact outgoing payload (HTML for `--email`, the Telegram
